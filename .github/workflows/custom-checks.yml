@@ -26,6 +26,8 @@ jobs:
         run: bash tests/guia_catalogo_tv.sh
       - name: StreamViX genre compatibility
         run: bash tests/guia_streamvix.sh
+      - name: Verify stream event ID widths
+        run: python3 tests/streamvix_eventid_widths.py
       - name: Custom and production identity regression
         run: bash tests/custom_identity.sh
       - name: Guide catalog limits
