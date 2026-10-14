@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 180
     steps:
       - name: "Scarica i sorgenti della nostra fork"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: feature/streamvix-guide-custom-webos
           persist-credentials: false
@@ -45,7 +45,7 @@ jobs:
           python3 -m py_compile tools/custom-homebrew.py
 
       - name: "Prepara Node.js per il packaging webOS"
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 
@@ -64,7 +64,7 @@ jobs:
           # Never put personal account tokens, service-role keys or debrid keys here.
           cat > "$GITHUB_WORKSPACE/local.properties" <<'PROPERTIES'
           NUVIO_SUPABASE_URL=https://api.nuvio.tv
-          NUVIO_SUPABASE_ANON_KEY=sb_publishable_1Clq8rlTVACkdcZuqr6_AD__xUUC_EN
+          NUVIO_SUPABASE_ANON_KEY=${{ secrets.NUVIO_CLOUD_PUBLISHABLE_KEY }}
           TV_LOGIN_WEB_BASE_URL=https://nuvio.tv/tv-login
           SIMKL_APP_NAME=nuvio
           PROPERTIES
@@ -90,8 +90,16 @@ jobs:
           set -euo pipefail
           export NUVIO_ARES_PACKAGE="$(command -v ares-package)"
           export NUVIO_PROPERTIES="$GITHUB_WORKSPACE/local.properties"
-          bash tools/build-custom.sh
+          bash tools/build-custom.sh 2>&1 | tee "$GITHUB_WORKSPACE/build-custom-run.log"
           test "$(find build/custom -maxdepth 1 -name '*.ipk' | wc -l)" -eq 1
+
+      - name: "Log diagnostico compilazione"
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: "Nuvio-Custom-build-log"
+          path: build-custom-run.log
+          if-no-files-found: warn
 
       - name: "Genera il repository Homebrew dal pacchetto verificato"
         shell: bash
@@ -108,7 +116,7 @@ jobs:
           sha256sum "$IPK_FILE"
 
       - name: "Rendi disponibile lo ZIP con IPK e repo.json"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: "Nuvio-Legacy-Custom-IPK-${{ github.run_number }}"
           path: |
