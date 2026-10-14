@@ -9,7 +9,7 @@ runtime=${NUVIO_CONTAINER_RUNTIME:-podman}
 packager=${NUVIO_ARES_PACKAGE:-}
 if [ "$#" -gt 0 ]; then
   if [ "$#" = 2 ] && [ "$1" = --output ]; then output=$2
-  else echo 'Usage: bash tools/build-dts-debug.sh [--output DIRECTORY]' >&2; exit 2; fi
+  else echo 'Usage: bash tools/build-custom.sh [--output DIRECTORY]' >&2; exit 2; fi
 fi
 if [ -z "$packager" ]; then
   packager=$(command -v ares-package || true)
@@ -64,7 +64,9 @@ PY
 export NUVIO_CONTAINER_RUNTIME="$runtime" NUVIO_SDK_IMAGE="$image" NUVIO_ARES_PACKAGE="$packager"
 export NUVIO_BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/amd64}"
 export NUVIO_DTS_FFMPEG=1
-export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_CUSTOM_BUILD -DNV_APP_ID=\"space.nuvio.native.legacy.custom\""
+# The Custom ID is a C string literal in src/app_id.h. Passing it in
+# NUVIO_EXTRA_CFLAGS via GCC response files strips the protective quotes.
+export NUVIO_EXTRA_CFLAGS="${NUVIO_EXTRA_CFLAGS:-} -DNV_CUSTOM_BUILD"
 # Read the original configuration by absolute path; never copy it into the package.
 if [ -n "${NUVIO_PROPERTIES:-}" ]; then
   export NUVIO_PROPERTIES=$(python3 -c 'import os,sys;print(os.path.abspath(sys.argv[1]))' "$NUVIO_PROPERTIES")
