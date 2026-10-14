@@ -837,7 +837,7 @@ int main(int argc, char **argv) {
   // o compositor NAO exibe a janela — o app roda a 60fps desenhando para
   // ninguem. Medido: "Invalid appId specified OR Unsupported Application Type".
 #ifndef NV_SEM_WEBOS
-#ifdef NV_DTS_DEBUG
+#if defined(NV_DTS_DEBUG) || defined(NV_CUSTOM_BUILD)
   setenv("APPID", NV_APP_ID, 1);
   setenv("LS2_APPID", NV_APP_ID, 1);
 #else
