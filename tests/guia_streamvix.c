@@ -22,7 +22,7 @@ char *rede_baixar(const char *url, int timeout) {
   if (strstr(url, "/streamvix_eventi/genre=Coppe.json?example=1")) {
     char body[512];
     snprintf(body, sizeof body,
-      "{\\"metas\\":[{\\"id\\":\\"%s\\",\\"type\\":\\"tv\\",\\"name\\":\\"Roma - European Cup\\",\\"genres\\":[\\"Coppe\\"]}]}", romaEventId);
+      "{\"metas\":[{\"id\":\"%s\",\"type\":\"tv\",\"name\":\"Roma - European Cup\",\"genres\":[\"Coppe\"]}]}", romaEventId);
     return strdup(body);
   }
   if (strstr(url, "/streamvix_tv/genre=RAI&skip=100.json?example=1"))
