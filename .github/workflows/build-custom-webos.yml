@@ -1,0 +1,154 @@
+name: "Compila Nuvio Legacy Custom (.ipk)"
+
+# Runs from master but deliberately builds the feature branch.
+# No changes to the original Nuvio Legacy installation or its repository.
+on:
+  workflow_dispatch:
+    inputs:
+      publish_homebrew:
+        description: "Pubblica la build anche come release Homebrew (beta non testata sulla TV)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-nuvio-legacy-custom
+  cancel-in-progress: false
+
+jobs:
+  build-webos-ipk:
+    name: "Compila IPK LG webOS ARMv7"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - name: "Scarica i sorgenti della nostra fork"
+        uses: actions/checkout@v4
+        with:
+          ref: feature/streamvix-guide-custom-webos
+          persist-credentials: false
+
+      - name: "Verifica sorgenti e Guida TV"
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libgles2-mesa-dev \
+            libegl1-mesa-dev zlib1g-dev
+          bash tests/guia_catalogo_tv.sh
+          bash tests/guia_streamvix.sh
+          bash tests/guiacorte.sh
+          bash -n tools/build-custom.sh
+          python3 -m py_compile tools/custom-homebrew.py
+
+      - name: "Prepara Node.js per il packaging webOS"
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: "Installa gli strumenti ufficiali webOS"
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --global @webos-tools/cli@3.2.6
+          command -v ares-package
+
+      - name: "Prepara i soli parametri pubblici del cloud Nuvio"
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Source: NuvioMedia/self-host/.env.example (publishable cloud client key).
+          # Never put personal account tokens, service-role keys or debrid keys here.
+          cat > "$GITHUB_WORKSPACE/local.properties" <<'PROPERTIES'
+          NUVIO_SUPABASE_URL=https://api.nuvio.tv
+          NUVIO_SUPABASE_ANON_KEY=sb_publishable_1Clq8rlTVACkdcZuqr6_AD__xUUC_EN
+          TV_LOGIN_WEB_BASE_URL=https://nuvio.tv/tv-login
+          SIMKL_APP_NAME=nuvio
+          PROPERTIES
+          chmod 600 "$GITHUB_WORKSPACE/local.properties"
+          NUVIO_PROPERTIES="$GITHUB_WORKSPACE/local.properties" \
+            bash tools/env.sh --require-core >/dev/null
+
+      - name: "Prepara SDK LG webOS e librerie native"
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --platform linux/amd64 \
+            --build-arg SDK_URL=https://github.com/openlgtv/buildroot-nc4/releases/download/webos-a38c582/arm-webos-linux-gnueabi_sdk-buildroot-x86_64.tar.gz \
+            --tag nuvio-webos-sdk tools/
+
+      - name: "Compila il pacchetto indipendente Custom"
+        shell: bash
+        env:
+          NUVIO_CONTAINER_RUNTIME: docker
+          NUVIO_BUILD_PLATFORM: linux/amd64
+          NUVIO_P2P_MOTOR: none
+        run: |
+          set -euo pipefail
+          export NUVIO_ARES_PACKAGE="$(command -v ares-package)"
+          export NUVIO_PROPERTIES="$GITHUB_WORKSPACE/local.properties"
+          bash tools/build-custom.sh
+          test "$(find build/custom -maxdepth 1 -name '*.ipk' | wc -l)" -eq 1
+
+      - name: "Genera il repository Homebrew dal pacchetto verificato"
+        shell: bash
+        run: |
+          set -euo pipefail
+          IPK_FILE="$(find build/custom -maxdepth 1 -type f -name '*.ipk' -print -quit)"
+          test -s "$IPK_FILE"
+          VERSION="$(python3 -c "import json; print(json.load(open('deploy/app/appinfo.json'))['version'])")"
+          TAG="v${VERSION}-custom.${GITHUB_RUN_NUMBER}"
+          python3 tools/custom-homebrew.py "$IPK_FILE" \
+            --repository "$GITHUB_REPOSITORY" --tag "$TAG"
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+          echo "IPK_FILE=$IPK_FILE" >> "$GITHUB_ENV"
+          sha256sum "$IPK_FILE"
+
+      - name: "Rendi disponibile lo ZIP con IPK e repo.json"
+        uses: actions/upload-artifact@v4
+        with:
+          name: "Nuvio-Legacy-Custom-IPK-${{ github.run_number }}"
+          path: |
+            build/custom/*.ipk
+            build/custom/*.ipk.sha256
+            build/custom/*.ipk.json
+            build/homebrew-custom/repo.json
+            build/homebrew-custom/webosbrew.manifest.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: "Pubblica come release per Homebrew Channel (solo se richiesto)"
+        if: ${{ inputs.publish_homebrew }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" \
+            "$IPK_FILE" \
+            "build/homebrew-custom/repo.json" \
+            "build/homebrew-custom/webosbrew.manifest.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target feature/streamvix-guide-custom-webos \
+            --title "Nuvio Legacy Custom $RELEASE_TAG (test LG)" \
+            --notes "Versione sperimentale per LG webOS. Installazione separata dall'app Legacy originale. Include il supporto TV Guide ai generi di StreamViX. La compatibilita del player con il nuovo App ID deve essere verificata su TV reale. Il motore P2P locale non e incluso in questa prima build." \
+            --latest
+
+      - name: "Mostra il risultato"
+        shell: bash
+        run: |
+          {
+            echo "## Build Nuvio Legacy Custom"
+            echo
+            echo "- Pacchetto IPK: incluso negli artefatti di questa esecuzione."
+            echo "- ID app: \`space.nuvio.native.legacy.custom\` (separato dalla versione originale)."
+            if [ "${{ inputs.publish_homebrew }}" = "true" ]; then
+              echo "- Release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG"
+              echo "- Homebrew repo: https://github.com/$GITHUB_REPOSITORY/releases/latest/download/repo.json"
+            else
+              echo "- Non è stata pubblicata una release Homebrew; per farlo riavvia il workflow selezionando l'opzione di pubblicazione."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
