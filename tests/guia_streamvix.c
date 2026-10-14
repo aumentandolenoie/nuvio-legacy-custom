@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+// The Guide-to-player handoff uses i18n for the channel subtitle. No UI
+// translation service is linked in the isolated host regression test.
+const char *i18n(const char *s) { return s; }
+
 static int requests;
 // StreamViX Live.py: up to 60 characters of slug, a dash, YYYYMMDD, then
 // the Stremio catalog prefixes the ID with "tv:" (72 characters total).
