@@ -75,7 +75,7 @@ static int nAddon;
 static unsigned versaoLista;   // ver addons_versao
 static _Atomic AddEstado estado = ADD_PARADO;
 static pthread_t fio;
-static char alvoId[64], alvoTipo[16];
+static char alvoId[96], alvoTipo[16];
 // The current target is a personal-server item (jfid.h: Jellyfin/Emby/Plex): sources come from the
 // server's PlaybackInfo, never from addons (an opaque server id must not
 // reach third-party addons).
@@ -105,7 +105,7 @@ static int nResultado;
 static Uint32 resultadoQuando;
 static int resultadoCacheavel;
 static FontecacheEscopo fioEscopo;
-static char pendId[64], pendTipo[16];
+static char pendId[96], pendTipo[16];
 // A ORIGEM DO PEDIDO QUE FICOU NA FILA. Zapear com uma busca de canal ainda no
 // ar enfileira o canal novo (pendId), mas app.c zera a origem logo depois de
 // addons_buscar: ao tirar o pedido da fila alvoBase estava vazio e a consulta
@@ -604,7 +604,7 @@ AddEstado addons_estado(void) {
     progLimpar();
     free(resultado); resultado = NULL; nResultado = 0;
     if (pendId[0]) {
-      char id[64], tipo[16];
+      char id[sizeof alvoId], tipo[16];
       int renovar = pendRenovar;
       snprintf(id, sizeof id, "%s", pendId);
       snprintf(tipo, sizeof tipo, "%s", pendTipo);

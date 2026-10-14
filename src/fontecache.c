@@ -19,7 +19,7 @@
 #define FC_TIPO "tv"
 
 typedef struct {
-  char    id[64];
+  char    id[96];
   char    tipo[16];
   Stream *lista;          // malloc de n * sizeof(Stream); NULL = vaga
   int     n;
@@ -43,7 +43,7 @@ static unsigned vodGeracao;
 // Os pedidos do guia: no maximo dois (um vizinho de cada lado). Substituidos
 // inteiros a cada engatilhar — o foco mudou, os vizinhos de antes nao
 // interessam mais.
-static char   pend[2][64];
+static char   pend[2][96];
 // A base do addon que publicou cada vizinho, para o prefetch perguntar SO a
 // ele (mesma regra de alvoBase em addons.c; sem ela cada prefetch ia a todos
 // os addons de fonte). Vazia = todos.
@@ -56,7 +56,7 @@ static Uint32 pedidoEm;
 // (o padrao de fioLegCriado), porque um fio terminado que ninguem junta vaza.
 static pthread_t fio;
 static int    vivo, criado;
-static char   emCurso[64];
+static char   emCurso[96];
 static int    cancelar;
 static int    emCursoVod;
 static FontecacheEscopo preEscopo;
@@ -302,7 +302,7 @@ static int cancelado(void *u) {
 
 static void *prefetch(void *u) {
   Stream *lista = NULL;
-  char id[64], base[600];
+  char id[96], base[600];
   int n;
   Uint32 inicio = FC_AGORA();
   (void)u;
@@ -342,7 +342,7 @@ static void *prefetch(void *u) {
 // se nao ha fio no ar e o foco ja descansou. Quem chama ja garantiu que a
 // busca principal esta ociosa e que o player nao esta carregando.
 static void tentar(void) {
-  char id[64] = "", base[600] = "";
+  char id[96] = "", base[600] = "";
   int k, juntar;
   Uint32 agora = FC_AGORA();
   pthread_mutex_lock(&trava);

@@ -120,7 +120,10 @@ typedef struct {
   // voltava vazio ("source error"). Medido no Mac com a conta do dono, #37.
   // O cache em disco carrega sizeof(CatItem) no cabecalho e se invalida
   // sozinho com esta mudanca.
-  char imdb[64];
+  // StreamViX generates dynamic sport-event IDs up to 72 bytes including
+  // "tv:" prefix (name slug + YYYYMMDD); 64 silently truncates their IDs.
+  // The on-disk catalog cache includes sizeof(CatItem) and is invalidated.
+  char imdb[96];
   char tipo[8];
   // Autoria do feed social, separada dos metadados do filme.
   char socialNome[96], socialSlug[128], socialAvatar[768], socialAcao[64];

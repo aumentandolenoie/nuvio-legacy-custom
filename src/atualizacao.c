@@ -966,6 +966,9 @@ static int podeReconsultar(void) {
 }
 
 void atualizacao_verificar(void) {
+#ifdef NV_CUSTOM_BUILD
+  return; /* Custom builds use their own Homebrew releases, never upstream. */
+#endif
 #ifdef NV_DTS_DEBUG
   return; /* Debug IPKs are installed explicitly, outside production updates. */
 #endif
@@ -990,6 +993,9 @@ void atualizacao_verificar(void) {
 }
 
 void atualizacao_procurar_agora(void) {
+#ifdef NV_CUSTOM_BUILD
+  return;
+#endif
 #ifdef NV_DTS_DEBUG
   return;
 #endif

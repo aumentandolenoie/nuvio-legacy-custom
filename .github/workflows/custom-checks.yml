@@ -1,0 +1,34 @@
+name: Nuvio Legacy Custom - source checks
+
+on:
+  push:
+    branches:
+      - feature/streamvix-guide-custom-webos
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  guide-tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native test headers
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libgles2-mesa-dev libegl1-mesa-dev zlib1g-dev
+      - name: Verify isolated packaging script syntax
+        run: |
+          bash -n tools/build-custom.sh
+          python3 -m py_compile tools/custom-homebrew.py
+      - name: TV catalog regression
+        run: bash tests/guia_catalogo_tv.sh
+      - name: StreamViX genre compatibility
+        run: bash tests/guia_streamvix.sh
+      - name: Verify stream event ID widths
+        run: python3 tests/streamvix_eventid_widths.py
+      - name: Custom and production identity regression
+        run: bash tests/custom_identity.sh
+      - name: Guide catalog limits
+        run: bash tests/guiacorte.sh
