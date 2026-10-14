@@ -677,12 +677,69 @@ static int sCanalPorId(const char *id) {
 // laco em fioGuia). Devolve quantos metas a pagina trouxe; `novos` recebe
 // quantos entraram de fato — a diferenca e o que separa "acabou" de
 // "catalogo que ignora skip e repete a mesma pagina".
-static int lerPagina(const GFonte *f, int skip, int teto, int *novos) {
+// NUVIO_CUSTOM_STREAMVIX_20261014
+// StreamViX requires a genre, even for its Live TV catalogs.
+// Read its known categories without changing the addon or the playback URLs.
+// This compatibility shim matches the StreamViX 12.4.23 manifest.
+static const char *const svTvGeneri[] = {
+  "RAI", "Mediaset", "Sky", "Sport", "Cinema", "Documentari",
+  "Discovery", "News", "Generali", "Bambini", "Pluto", NULL
+};
+static const char *const svLiveGeneri[] = {
+  "Z-Eventi", "AK-Eventi", "X-Eventi", "THISNOT", "SportzX", "Sports99",
+  "Freeshot", "pa.cc", NULL
+};
+static const char *const svEventiGeneri[] = {
+  "Serie A", "Serie B", "Serie C", "Coppe", "Soccer", "Premier League",
+  "Liga", "Bundesliga", "Ligue 1", "Tennis", "F1", "MotoGp", "Basket",
+  "Volleyball", "Ice Hockey", "Wrestling", "Boxing", "Darts",
+  "Baseball", "NFL", NULL
+};
+static const char *const *svGeneri(const char *id) {
+  if (!id) return NULL;
+  if (!strcmp(id, "streamvix_tv")) return svTvGeneri;
+  if (!strcmp(id, "streamvix_live")) return svLiveGeneri;
+  if (!strcmp(id, "streamvix_eventi")) return svEventiGeneri;
+  return NULL;
+}
+static int svCatalogoSoloRicerca(const char *id) {
+  return id && (!strcmp(id, "streamvix_tv_search") ||
+                !strcmp(id, "streamvix_live_search") ||
+                !strcmp(id, "streamvix_eventi_search"));
+}
+static int svEncodeGenero(char *dst, size_t n, const char *genre) {
+  static const char hex[] = "0123456789ABCDEF";
+  const unsigned char *p = (const unsigned char *)genre;
+  size_t k = 0;
+  if (!dst || !n || !p) return 0;
+  while (*p) {
+    unsigned char c = *p++;
+    int safe = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+               (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~';
+    size_t add = safe ? 1u : 3u;
+    if (k + add >= n) { dst[0] = 0; return 0; }
+    if (safe) dst[k++] = (char)c;
+    else { dst[k++] = '%'; dst[k++] = hex[c >> 4]; dst[k++] = hex[c & 15]; }
+  }
+  dst[k] = 0;
+  return 1;
+}
+
+static int lerPaginaEx(const GFonte *f, int skip, int teto, int *novos, const char *genre) {
   char url[NV_ADDON_PEDIDO_MAX];
   char *corpo;
   const char *p;
   int n = 0, w, semBase = 0;
-  if (skip > 0)
+  if (genre && *genre) {
+    char encoded[192];
+    if (!svEncodeGenero(encoded, sizeof encoded, genre)) return 0;
+    if (skip > 0)
+      w = nv_addon_url(url, sizeof url, f->base,
+          "/catalog/%s/%s/genre=%s&skip=%d.json", f->tipo, f->id, encoded, skip);
+    else
+      w = nv_addon_url(url, sizeof url, f->base,
+          "/catalog/%s/%s/genre=%s.json", f->tipo, f->id, encoded);
+  } else if (skip > 0)
     w = nv_addon_url(url, sizeof url, f->base, "/catalog/%s/%s/skip=%d.json",
                      f->tipo, f->id, skip);
   else
@@ -715,6 +772,9 @@ static int lerPagina(const GFonte *f, int skip, int teto, int *novos) {
       { const char *g = js_array(p, fim, "genre");
         if (!g) g = js_array(p, fim, "genres");
         lerStrEl(g, gen, sizeof gen); }
+      // The selected StreamViX category is the fallback when metadata
+      // has no genre: do not put all channels under "StreamViX TV".
+      if (!gen[0] && genre && *genre) snprintf(gen, sizeof gen, "%s", genre);
       // SEM GENERO: primeiro o nome do canal (categoriaPorNome), depois o
       // nome do catalogo de onde ele veio ("Meu Futebol"), que e a
       // classificacao que o proprio addon deu. Meu Futebol manda 68 canais
@@ -753,6 +813,11 @@ static int lerPagina(const GFonte *f, int skip, int teto, int *novos) {
     fflush(stdout);
   }
   return n;
+}
+
+// Keep the original signature for other addons and existing Guide tests.
+static int lerPagina(const GFonte *f, int skip, int teto, int *novos) {
+  return lerPaginaEx(f, skip, teto, novos, NULL);
 }
 
 static int fonteJa(const char *base, const char *id) {   // indice ou -1
@@ -813,6 +878,7 @@ static void sondaManifestos(void) {
         if (sb) sb->canal = nc > 0;
         if (!ativo) continue;
         for (k = 0; k < nc && sNFontes < G_MAX_FONTE; k++) {
+          if (svCatalogoSoloRicerca(cc[k].id)) continue;
           int ja = fonteJa(base, cc[k].id);
           if (ja < 0) {
             ja = sNFontes++;
@@ -865,7 +931,7 @@ static void sondaManifestos(void) {
       js_texto(p, f, "id", id, sizeof id);
       js_texto(p, f, "name", nome, sizeof nome);
       if (ehCanal(tipo)) temCanal = 1;
-      if (ehCanal(tipo) && id[0]) {
+      if (ehCanal(tipo) && id[0] && !svCatalogoSoloRicerca(id)) {
         ja = fonteJa(base, id);
         if (ja < 0) {
           ja = sNFontes++;
@@ -912,7 +978,19 @@ static void *fioGuia(void *u) {
     int restantes = sNFontes - i;
     int cota = (G_MAX_CANAL - sNCanais) / (restantes > 0 ? restantes : 1);
     int lidos = 0;
+    const char *const *genres = svGeneri(sFontes[i].id);
     if (cota < G_COTA_MIN) cota = G_COTA_MIN;
+    if (genres) {
+      // StreamViX normally sends the complete category in one response.
+      // Keep the existing Guide per-catalog and global quotas.
+      for (int g = 0; genres[g] && sNCanais < G_MAX_CANAL && lidos < cota; g++) {
+        int novos = 0;
+        int n = lerPaginaEx(&sFontes[i], 0, cota - lidos, &novos, genres[g]);
+        if (n > 0) ok = 1;
+        lidos += novos;
+      }
+      continue;
+    }
     for (int skip = 0; sNCanais < G_MAX_CANAL && lidos < cota; skip += G_PAGINA) {
       int novos = 0;
       int n = lerPagina(&sFontes[i], skip, cota - lidos, &novos);
