@@ -26,5 +26,7 @@ jobs:
         run: bash tests/guia_catalogo_tv.sh
       - name: StreamViX genre compatibility
         run: bash tests/guia_streamvix.sh
+      - name: Custom and production identity regression
+        run: bash tests/custom_identity.sh
       - name: Guide catalog limits
         run: bash tests/guiacorte.sh
