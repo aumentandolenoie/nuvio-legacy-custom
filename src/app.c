@@ -920,7 +920,7 @@ static void fitPassivaPermitir(void) {
 }
 
 static void buscarParaPlayerModo(int renovar) {
-  char alvo[64]; alvoPlayer(alvo,sizeof alvo);
+  char alvo[96]; alvoPlayer(alvo,sizeof alvo);
   const char *idC = player_id_canal();
   // Episodio novo abre um ciclo novo de fontes. A fonte automatica do
   // episodio anterior nao pode contaminar o watchdog nem a lista de exclusao.
@@ -959,7 +959,7 @@ static void buscarParaPlayer(void) { buscarParaPlayerModo(0); }
 // assinado que expira; o dono cobre o episodio errado. Sao duas coisas.
 static void renovarListaDoPlayer(void) {
   const CatItem *ci = cat_item(player_indice());
-  char alvoP[64]; alvoPlayer(alvoP, sizeof alvoP);
+  char alvoP[96]; alvoPlayer(alvoP, sizeof alvoP);
   if (ci && ci->imdb[0] && alvoP[0] &&
       (stream_idade_ms() > NV_LINK_VALIDO_MS || !stream_lista_do_alvo(alvoP))) {
     printf("fonte: lista com %ums%s, renovando (%s)\n",
