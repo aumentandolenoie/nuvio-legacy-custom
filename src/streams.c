@@ -134,7 +134,9 @@ static char contexto[320];
 // o carimbo do proximo pedido e `alvoLista` o da lista que esta em memoria.
 // 64 e o mesmo tamanho que app.c usa para montar "tt1234567:99:99" e para os
 // ids de canal do stalker/xtream, que sao os maiores que passam por aqui.
-static char alvoPedido[64], alvoLista[64];
+// A StreamViX sports event ID can reach 72 bytes including the tv: prefix.
+// Keep the source-list identity intact across the async stream response.
+static char alvoPedido[96], alvoLista[96];
 static pthread_mutex_t fitMetaTrava = PTHREAD_MUTEX_INITIALIZER;
 // RUNTIME PER EXACT TARGET (F03). A few recent targets, each with its two
 // provenances kept apart: metadata (TMDB/Cinemeta/addon runtime) and the
