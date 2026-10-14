@@ -64,10 +64,17 @@ jobs:
           # Never put personal account tokens, service-role keys or debrid keys here.
           cat > "$GITHUB_WORKSPACE/local.properties" <<'PROPERTIES'
           NUVIO_SUPABASE_URL=https://api.nuvio.tv
-          NUVIO_SUPABASE_ANON_KEY=${{ secrets.NUVIO_CLOUD_PUBLISHABLE_KEY }}
           TV_LOGIN_WEB_BASE_URL=https://nuvio.tv/tv-login
           SIMKL_APP_NAME=nuvio
           PROPERTIES
+          # Read the public Nuvio client key from NuvioMedia's own source.
+          # Avoid requiring a user secret for a documented publishable value.
+          PUBLIC_KEY="$(curl -fsSL --retry 3 https://raw.githubusercontent.com/NuvioMedia/self-host/main/.env.example | sed -n 's/^NUVIO_CLOUD_PUBLISHABLE_KEY=//p' | head -1)"
+          if [ -z "$PUBLIC_KEY" ]; then
+            echo "Missing public Nuvio cloud client key from upstream .env.example" >&2
+            exit 2
+          fi
+          printf 'NUVIO_SUPABASE_ANON_KEY=%s\n' "$PUBLIC_KEY" >> "$GITHUB_WORKSPACE/local.properties"
           chmod 600 "$GITHUB_WORKSPACE/local.properties"
           NUVIO_PROPERTIES="$GITHUB_WORKSPACE/local.properties" \
             bash tools/env.sh --require-core >/dev/null
