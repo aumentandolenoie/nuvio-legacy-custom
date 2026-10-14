@@ -40,6 +40,7 @@ jobs:
             libegl1-mesa-dev zlib1g-dev
           bash tests/guia_catalogo_tv.sh
           bash tests/guia_streamvix.sh
+          python3 tests/streamvix_eventid_widths.py
           bash tests/custom_identity.sh
           bash tests/guiacorte.sh
           bash -n tools/build-custom.sh
